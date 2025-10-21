@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "app.py",
+      "src": "api/index.py",
       "use": "@vercel/python",
       "config": {
         "maxLambdaSize": "50mb"
@@ -11,16 +11,22 @@
   ],
   "routes": [
     {
-      "src": "/(.*)",
-      "dest": "app.py"
+      "src": "/api/(.*)",
+      "dest": "api/index.py"
+    },
+    {
+      "src": "/",
+      "dest": "api/index.py"
     }
   ],
   "functions": {
-    "app.py": {
-      "maxDuration": 30
+    "api/index.py": {
+      "maxDuration": 30,
+      "memory": 1024
     }
   },
   "env": {
-    "PYTHON_VERSION": "3.9"
-  }
+    "PYTHON_VERSION": "3.11"
+  },
+  "regions": ["iad1"]
 }
