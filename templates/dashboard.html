@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Vendas - Tempo Real</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .header p {
+            color: #7f8c8d;
+            text-align: center;
+            font-size: 1.1em;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.95em;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
+            min-width: 140px;
+            height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(52, 152, 219, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-success {
+            background: linear-gradient(45deg, #27ae60, #229954);
+            box-shadow: 0 5px 15px rgba(39, 174, 96, 0.3);
+        }
+
+        .btn-warning {
+            background: linear-gradient(45deg, #f39c12, #e67e22);
+            box-shadow: 0 5px 15px rgba(243, 156, 18, 0.3);
+        }
+
+        .status {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 10px;
+            font-weight: 600;
+        }
+
+        .status.success {
+            color: #27ae60;
+            background: rgba(39, 174, 96, 0.1);
+        }
+
+        .status.error {
+            color: #e74c3c;
+            background: rgba(231, 76, 60, 0.1);
+        }
+
+        .status.loading {
+            color: #f39c12;
+            background: rgba(243, 156, 18, 0.1);
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .card h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-card h3 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .stat-card p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .data-table th {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            color: white;
+            font-weight: 600;
+        }
+
+        .data-table tr:hover {
+            background-color: rgba(52, 152, 219, 0.1);
+        }
+
+        .analysis-content {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 5px solid #3498db;
+            white-space: pre-wrap;
+            line-height: 1.6;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        /* Chat Styles */
+        .chat-container {
+            height: 400px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            max-height: 300px;
+        }
+
+        .chat-message {
+            margin-bottom: 15px;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        .user-message {
+            text-align: right;
+        }
+
+        .bot-message {
+            text-align: left;
+        }
+
+        .message-content {
+            display: inline-block;
+            padding: 10px 15px;
+            border-radius: 15px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+
+        .user-message .message-content {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            color: white;
+        }
+
+        .bot-message .message-content {
+            background: #e9ecef;
+            color: #333;
+        }
+
+        .chat-input-container {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 25px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+
+        .chat-input:focus {
+            border-color: #3498db;
+        }
+
+        .chat-input::placeholder {
+            color: #999;
+        }
+
+        #send-btn {
+            min-width: 80px;
+            height: 45px;
+            border-radius: 25px;
+            font-size: 14px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            color: #666;
+            font-style: italic;
+        }
+
+        .typing-dots {
+            display: inline-block;
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background-color: #666;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+
+        .typing-dots:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dots:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes typing {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .btn {
+                min-width: 120px;
+                height: 40px;
+                font-size: 0.9em;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Dashboard de Vendas</h1>
+            <p>Análise em tempo real dos dados da planilha</p>
+        </div>
+
+        <div class="controls">
+            <button class="btn" onclick="updateData()">
+                <span id="update-spinner" class="loading-spinner hidden"></span>
+                Atualizar Dados
+            </button>
+            <button class="btn btn-success" onclick="getAnalysis()">
+                <span id="analysis-spinner" class="loading-spinner hidden"></span>
+                Análise com IA
+            </button>
+            <button class="btn btn-warning" onclick="toggleAutoUpdate()">
+                <span id="auto-update-text">Auto-Update: ON</span>
+            </button>
+        </div>
+
+        <div id="status" class="status hidden"></div>
+
+        <div class="stats-grid" id="stats-grid">
+            <!-- Estatísticas serão inseridas aqui -->
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="card">
+                <h2>Dados da Planilha</h2>
+                <div id="data-info">
+                    <p>Clique em "Atualizar Dados" para carregar informações da planilha</p>
+                </div>
+                <div id="data-table-container" class="hidden">
+                    <table class="data-table" id="data-table">
+                        <thead>
+                            <tr id="table-headers"></tr>
+                        </thead>
+                        <tbody id="table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Chat com IA</h2>
+                <div id="chat-container" class="chat-container">
+                    <div id="chat-messages" class="chat-messages">
+                        <div class="chat-message bot-message">
+                            <div class="message-content">
+                                <strong>🤖 Assistente IA:</strong> Olá! Sou seu assistente de análise de vendas. Como posso ajudá-lo hoje?
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chat-input-container">
+                        <input type="text" id="chat-input" placeholder="Digite sua pergunta sobre os dados..." class="chat-input">
+                        <button onclick="sendMessage()" class="btn btn-success" id="send-btn">Enviar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top: 30px;">
+            <h2>Análise Inteligente</h2>
+            <div id="analysis-content" class="analysis-content">
+                <p>Clique em "Análise com IA" para obter insights dos seus dados</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let autoUpdateInterval;
+        let autoUpdateEnabled = true;
+
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', function() {
+            loadData();
+            startAutoUpdate();
+        });
+
+        function showStatus(message, type = 'success') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.classList.remove('hidden');
+            
+            setTimeout(() => {
+                status.classList.add('hidden');
+            }, 5000);
+        }
+
+        function showLoading(elementId) {
+            document.getElementById(elementId).classList.remove('hidden');
+        }
+
+        function hideLoading(elementId) {
+            document.getElementById(elementId).classList.add('hidden');
+        }
+
+        async function updateData() {
+            showLoading('update-spinner');
+            
+            try {
+                const response = await fetch('/api/update', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showStatus(`${result.message} - ${result.count} registros encontrados`, 'success');
+                    loadData();
+                } else {
+                    showStatus(`${result.message}`, 'error');
+                }
+            } catch (error) {
+                showStatus(`Erro ao atualizar: ${error.message}`, 'error');
+            } finally {
+                hideLoading('update-spinner');
+            }
+        }
+
+        async function loadData() {
+            try {
+                const response = await fetch('/api/data');
+                const result = await response.json();
+                
+                // Verifica se temos dados de múltiplas guias ou uma única guia
+                if (result.data) {
+                    let allData = [];
+                    let totalRecords = 0;
+                    
+                    if (Array.isArray(result.data)) {
+                        // Dados de uma única guia (formato antigo)
+                        allData = result.data;
+                        totalRecords = result.count || result.data.length;
+                    } else {
+                        // Dados de múltiplas guias (formato novo)
+                        for (const [sheetKey, sheetData] of Object.entries(result.data)) {
+                            if (sheetData.dados && Array.isArray(sheetData.dados)) {
+                                allData = allData.concat(sheetData.dados);
+                                totalRecords += sheetData.total_registros || 0;
+                            }
+                        }
+                    }
+                    
+                    if (allData.length > 0) {
+                        displayData(allData);
+                        updateStats(allData);
+                        document.getElementById('data-info').innerHTML = `
+                            <p><strong>Última atualização:</strong> ${result.last_update || 'N/A'}</p>
+                            <p><strong>Total de registros:</strong> ${totalRecords}</p>
+                            <p><strong>Guias processadas:</strong> ${result.total_sheets || 1}</p>
+                        `;
+                    } else {
+                        document.getElementById('data-info').innerHTML = '<p>Nenhum dado encontrado na planilha</p>';
+                    }
+                } else {
+                    document.getElementById('data-info').innerHTML = '<p>Nenhum dado encontrado na planilha</p>';
+                }
+            } catch (error) {
+                showStatus(`Erro ao carregar dados: ${error.message}`, 'error');
+            }
+        }
+
+        function displayData(data) {
+            if (!data || data.length === 0) return;
+
+            const table = document.getElementById('data-table');
+            const headers = document.getElementById('table-headers');
+            const body = document.getElementById('table-body');
+            
+            // Limpa tabela
+            headers.innerHTML = '';
+            body.innerHTML = '';
+
+            // Cria cabeçalhos
+            const columns = Object.keys(data[0]);
+            columns.forEach(column => {
+                const th = document.createElement('th');
+                th.textContent = column;
+                headers.appendChild(th);
+            });
+
+            // Adiciona dados (máximo 100 linhas para performance)
+            const displayData = data.slice(0, 100);
+            displayData.forEach(row => {
+                const tr = document.createElement('tr');
+                columns.forEach(column => {
+                    const td = document.createElement('td');
+                    td.textContent = row[column] || '';
+                    tr.appendChild(td);
+                });
+                body.appendChild(tr);
+            });
+
+            document.getElementById('data-table-container').classList.remove('hidden');
+        }
+
+        function updateStats(data) {
+            const statsGrid = document.getElementById('stats-grid');
+            
+            if (!data || data.length === 0) {
+                statsGrid.innerHTML = '<div class="stat-card"><h3>0</h3><p>Registros</p></div>';
+                return;
+            }
+
+            const totalRecords = data.length;
+            const columns = Object.keys(data[0]);
+            
+            let statsHTML = `
+                <div class="stat-card">
+                    <h3>${totalRecords}</h3>
+                    <p>Total de Registros</p>
+                </div>
+                <div class="stat-card">
+                    <h3>${columns.length}</h3>
+                    <p>Colunas</p>
+                </div>
+            `;
+
+            // Adiciona estatísticas específicas se houver colunas numéricas
+            const numericColumns = columns.filter(col => {
+                return data.some(row => !isNaN(parseFloat(row[col])) && isFinite(row[col]));
+            });
+
+            if (numericColumns.length > 0) {
+                numericColumns.slice(0, 2).forEach(col => {
+                    const values = data.map(row => parseFloat(row[col])).filter(v => !isNaN(v));
+                    if (values.length > 0) {
+                        const sum = values.reduce((a, b) => a + b, 0);
+                        const avg = (sum / values.length).toFixed(2);
+                        statsHTML += `
+                            <div class="stat-card">
+                                <h3>${avg}</h3>
+                                <p>Média ${col}</p>
+                            </div>
+                        `;
+                    }
+                });
+            }
+
+            statsGrid.innerHTML = statsHTML;
+        }
+
+        async function getAnalysis() {
+            showLoading('analysis-spinner');
+            
+            try {
+                const response = await fetch('/api/analysis');
+                const result = await response.json();
+                
+                if (result.analysis) {
+                    document.getElementById('analysis-content').textContent = result.analysis;
+                    showStatus('Análise gerada com sucesso!', 'success');
+                } else {
+                    showStatus('Erro ao gerar análise', 'error');
+                }
+            } catch (error) {
+                showStatus(`Erro ao obter análise: ${error.message}`, 'error');
+            } finally {
+                hideLoading('analysis-spinner');
+            }
+        }
+
+        function toggleAutoUpdate() {
+            autoUpdateEnabled = !autoUpdateEnabled;
+            const button = document.querySelector('.btn-warning');
+            const text = document.getElementById('auto-update-text');
+            
+            if (autoUpdateEnabled) {
+                startAutoUpdate();
+                text.textContent = 'Auto-Update: ON';
+                button.style.background = 'linear-gradient(45deg, #f39c12, #e67e22)';
+            } else {
+                stopAutoUpdate();
+                text.textContent = 'Auto-Update: OFF';
+                button.style.background = 'linear-gradient(45deg, #95a5a6, #7f8c8d)';
+            }
+        }
+
+        function startAutoUpdate() {
+            if (autoUpdateInterval) {
+                clearInterval(autoUpdateInterval);
+            }
+            
+            if (autoUpdateEnabled) {
+                autoUpdateInterval = setInterval(() => {
+                    loadData();
+                }, 30000); // Atualiza a cada 30 segundos
+            }
+        }
+
+        function stopAutoUpdate() {
+            if (autoUpdateInterval) {
+                clearInterval(autoUpdateInterval);
+                autoUpdateInterval = null;
+            }
+        }
+
+        // Chat Functions
+        function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // Adiciona mensagem do usuário
+            addMessage(message, 'user');
+            input.value = '';
+            
+            // Mostra indicador de digitação
+            showTypingIndicator();
+            
+            // Envia para a API
+            sendToAPI(message);
+        }
+
+        function addMessage(content, sender) {
+            const messagesContainer = document.getElementById('chat-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${sender}-message`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            
+            if (sender === 'user') {
+                contentDiv.innerHTML = `<strong>👤 Você:</strong> ${content}`;
+            } else {
+                contentDiv.innerHTML = `<strong>🤖 Assistente IA:</strong> ${content}`;
+            }
+            
+            messageDiv.appendChild(contentDiv);
+            messagesContainer.appendChild(messageDiv);
+            
+            // Scroll para a última mensagem
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function showTypingIndicator() {
+            const messagesContainer = document.getElementById('chat-messages');
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'chat-message bot-message';
+            typingDiv.id = 'typing-indicator';
+            
+            typingDiv.innerHTML = `
+                <div class="message-content">
+                    <div class="typing-indicator">
+                        <strong>🤖 Assistente IA:</strong> 
+                        <span class="typing-dots"></span>
+                        <span class="typing-dots"></span>
+                        <span class="typing-dots"></span>
+                    </div>
+                </div>
+            `;
+            
+            messagesContainer.appendChild(typingDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function hideTypingIndicator() {
+            const typingIndicator = document.getElementById('typing-indicator');
+            if (typingIndicator) {
+                typingIndicator.remove();
+            }
+        }
+
+        async function sendToAPI(message) {
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message: message })
+                });
+                
+                const result = await response.json();
+                
+                // Remove indicador de digitação
+                hideTypingIndicator();
+                
+                if (result.response) {
+                    addMessage(result.response, 'bot');
+                } else {
+                    addMessage('Desculpe, ocorreu um erro ao processar sua mensagem.', 'bot');
+                }
+            } catch (error) {
+                hideTypingIndicator();
+                addMessage('Erro de conexão. Tente novamente.', 'bot');
+                console.error('Erro no chat:', error);
+            }
+        }
+
+        // Permitir envio com Enter
+        document.getElementById('chat-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>
