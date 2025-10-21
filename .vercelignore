@@ -1,0 +1,54 @@
+# Arquivos de desenvolvimento
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Arquivos de configuração local
+.env
+config_api.py
+credentials.json
+token.json
+*.key
+
+# Arquivos de teste
+test_*.py
+*_test.py
+tests/
+
+# Arquivos temporários
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentação local
+README_API.md
+check_api.py
+setup_api.py
+test_*.py
