@@ -57,7 +57,10 @@ credentials.json
 token.json
 config_api.py
 .env
+.env.local
+.env.production
 *.key
+apps_script_url.txt
 
 # Temporary files
 *.tmp
