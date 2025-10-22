@@ -1,27 +1,30 @@
 from openai import OpenAI
 import os
+import dotenv
+dotenv.load_dotenv()
 
-# Sua chave de API real do OpenRouter
-API_KEY = "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"
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
-print(f"🔑 Usando sua chave de API: {API_KEY[:20]}...")
-
+# Configuração compatível com a versão instalada
 client = OpenAI(
-  base_url="https://openrouter.ai/api/v1",
-  api_key=API_KEY,
+    api_key=OPENROUTER_API_KEY,
+    base_url="https://openrouter.ai/api/v1"
 )
 
-def consultar_ia(mensagem):
+def consultar_ia(mensagem, system_message=None):
     """
     Função para consultar a IA usando OpenRouter com múltiplas tentativas
     """
     # Lista de modelos para tentar
     modelos = [
-        "deepseek/deepseek-chat-v3.1:free",
-        "meta-llama/llama-3.1-8b-instruct:free",
-        "microsoft/phi-3-mini-128k-instruct:free",
-        "google/gemma-2-9b-it:free"
+        "openai/gpt-oss-20b:free",
+        "meta-llama/llama-3.2-3b-instruct:free",
+        "google/gemma-2-9b-it:free",
     ]
+    
+    # Mensagem do sistema padrão ou personalizada
+    if system_message is None:
+        system_message = "Você é um assistente especializado em análise de dados de vendas. Responda em português brasileiro de forma clara, profissional e útil. Use formatação Markdown para organizar suas respostas."
     
     for modelo in modelos:
         try:
@@ -35,14 +38,14 @@ def consultar_ia(mensagem):
                 messages=[
                     {
                         "role": "system",
-                        "content": "Você é um assistente especializado em análise de dados de vendas. Responda em português brasileiro de forma clara e útil."
+                        "content": system_message
                     },
                     {
                         "role": "user",
                         "content": mensagem
                     }
                 ],
-                max_tokens=500,
+                max_tokens=1500,
                 temperature=0.7
             )
             resposta = completion.choices[0].message.content

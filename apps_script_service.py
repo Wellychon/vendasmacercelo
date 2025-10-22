@@ -6,6 +6,10 @@ import pandas as pd
 from datetime import datetime
 import json
 import os
+import dotenv
+
+# Carrega variáveis de ambiente
+dotenv.load_dotenv()
 
 class AppsScriptService:
     def __init__(self):
@@ -14,8 +18,15 @@ class AppsScriptService:
         
     def load_script_url(self):
         """
-        Carrega a URL do Apps Script do arquivo
+        Carrega a URL do Apps Script da variável de ambiente
         """
+        # Tenta carregar do .env primeiro
+        url = os.getenv('APPS_SCRIPT_URL')
+        
+        if url and 'script.google.com' in url:
+            return url
+        
+        # Fallback: tenta carregar do arquivo (retrocompatibilidade)
         try:
             if os.path.exists('apps_script_url.txt'):
                 with open('apps_script_url.txt', 'r') as f:
@@ -29,7 +40,7 @@ class AppsScriptService:
     
     def save_script_url(self, url):
         """
-        Salva a URL do Apps Script
+        Salva a URL do Apps Script (apenas para retrocompatibilidade)
         """
         try:
             with open('apps_script_url.txt', 'w') as f:
@@ -44,7 +55,7 @@ class AppsScriptService:
         """
         if not self.script_url:
             print("❌ URL do Apps Script não configurada!")
-            print("💡 Execute: python3 apps_script_setup.py")
+            print("💡 Configure APPS_SCRIPT_URL no arquivo .env")
             return None
         
         print("🔄 Buscando dados via Google Apps Script...")
@@ -56,7 +67,7 @@ class AppsScriptService:
                 'Accept': 'application/json',
             }
             
-            response = requests.get(self.script_url, headers=headers, timeout=30)
+            response = requests.get(self.script_url, headers=headers, timeout=60)
             
             if response.status_code == 200:
                 data = response.json()

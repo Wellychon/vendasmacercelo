@@ -2,27 +2,16 @@
   "version": 2,
   "builds": [
     {
-      "src": "api.py",
-      "use": "@vercel/python",
-      "config": {
-        "maxLambdaSize": "50mb",
-        "maxDuration": 30,
-        "memory": 1024
-      }
+      "src": "dashboard_app.py",
+      "use": "@vercel/python"
     }
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "api.py"
-    },
-    {
-      "src": "/",
-      "dest": "api.py"
+      "src": "/(.*)",
+      "dest": "dashboard_app.py"
     }
   ],
-  "env": {
-    "PYTHON_VERSION": "3.11"
-  },
-  "regions": ["iad1"]
+  "regions": ["gru1"]
 }
+

@@ -1,193 +1,238 @@
-# 🤖 Agente de Vendas - IA para Análise de Dados
+# Dashboard de Vendas - Marcelo 📊
 
-Sistema inteligente de análise de vendas com IA, integração com Google Sheets e deploy otimizado.
+Dashboard inteligente de vendas com análise de dados em tempo real e assistente de IA integrado.
 
-## 🚀 Deploy Rápido
+## 🚀 Recursos
 
-### Docker (Recomendado)
+- **Dashboard Interativo**: Visualização de KPIs, gráficos e tabelas dinâmicas
+- **Análise Inteligente**: IA para análise automática de dados de vendas
+- **Chat com IA**: Assistente virtual para responder perguntas sobre seus dados
+- **Integração Google Sheets**: Dados sempre atualizados via Apps Script
+- **Interface Moderna**: Design dark com UI/UX profissional
+
+## 📋 Pré-requisitos
+
+- Python 3.9+
+- Conta no Google (para Google Sheets)
+- Chave API do OpenRouter (opcional, para IA avançada)
+- Conta na Vercel (para deploy)
+
+## 🛠️ Instalação Local
+
+1. **Clone o repositório**
 ```bash
-# Deploy completo
-./deploy.sh
-
-# Acessar: http://localhost:8081
+git clone <seu-repositorio>
+cd "Projeto Marcelo | Agente de Vendas"
 ```
 
-### Vercel (Serverless)
+2. **Crie um ambiente virtual**
 ```bash
-# Instalar Vercel CLI
-npm install -g vercel
-
-# Deploy
-./deploy-vercel.sh
-
-# Acessar: https://seu-projeto.vercel.app
+python -m venv venv
+source venv/bin/activate  # No Windows: venv\Scripts\activate
 ```
 
-## ✨ Funcionalidades
-
-- 📊 **Análise de Vendas** - IA para insights automáticos
-- 📈 **Dashboard Interativo** - Visualizações em tempo real
-- 🤖 **Chat com IA** - Perguntas sobre vendas
-- 📋 **Integração Google Sheets** - Dados em tempo real
-- 🐳 **Deploy Docker** - Container otimizado
-- ☁️ **Deploy Vercel** - Serverless global
-
-## 🛠️ Tecnologias
-
-- **Backend**: Python, Flask
-- **IA**: OpenRouter API
-- **Dados**: Google Sheets API
-- **Deploy**: Docker, Vercel
-- **Frontend**: HTML, CSS, JavaScript
-
-## 📊 Métricas Atuais
-
-- **2.400 registros** de vendas
-- **12 guias** de dados
-- **Análise em tempo real**
-- **IA integrada**
-
-## 🎯 Opções de Deploy
-
-| Método | Complexidade | Custo | Performance | Recomendação |
-|--------|-------------|-------|-------------|---------------|
-| **Docker** | Baixa | Gratuito | Excelente | Produção |
-| **Vercel** | Muito Baixa | Gratuito* | Muito Boa | Demo/Teste |
-
-*Plano gratuito: 100GB bandwidth/mês
-
-## 🔧 Configuração
-
-### 1. Clonar Repositório
+3. **Instale as dependências**
 ```bash
-git clone https://github.com/Wellychon/assistentedevendas.git
-cd assistentedevendas
+pip install -r requirements.txt
 ```
 
-### 2. Configurar Variáveis
+4. **Configure as variáveis de ambiente**
 ```bash
-# Copiar arquivo de exemplo
-cp env.example .env
-
-# Editar com suas chaves
-nano .env
+cp .env.example .env
+# Edite o arquivo .env com suas credenciais
 ```
 
-### 3. Deploy
+5. **Execute a aplicação**
 ```bash
-# Docker
-./deploy.sh
+python dashboard_app.py
+```
 
-# Vercel
-./deploy-vercel.sh
+Acesse: http://localhost:8081
+
+## 🌐 Deploy na Vercel
+
+### Opção 1: Deploy via CLI
+
+1. **Instale o Vercel CLI**
+```bash
+npm i -g vercel
+```
+
+2. **Faça login na Vercel**
+```bash
+vercel login
+```
+
+3. **Configure as variáveis de ambiente**
+```bash
+vercel env add APPS_SCRIPT_URL
+vercel env add OPENROUTER_API_KEY
+```
+
+4. **Faça o deploy**
+```bash
+vercel --prod
+```
+
+### Opção 2: Deploy via GitHub
+
+1. **Conecte seu repositório no GitHub**
+2. **Importe no Vercel**: https://vercel.com/new
+3. **Configure as variáveis de ambiente** no dashboard da Vercel:
+   - `APPS_SCRIPT_URL`: URL do seu Google Apps Script
+   - `OPENROUTER_API_KEY`: Sua chave da OpenRouter
+
+## 🔑 Variáveis de Ambiente
+
+| Variável | Descrição | Obrigatória |
+|----------|-----------|-------------|
+| `APPS_SCRIPT_URL` | URL do Google Apps Script deployment | Sim |
+| `OPENROUTER_API_KEY` | Chave API do OpenRouter para IA | Não* |
+
+*Se não configurada, usa fallback local para análises
+
+## 📊 Configuração do Google Apps Script
+
+1. Acesse sua planilha no Google Sheets
+2. Vá em **Extensões** > **Apps Script**
+3. Cole o seguinte código:
+
+```javascript
+function doGet(e) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheets = ss.getSheets();
+    const result = {
+      success: true,
+      totalSheets: sheets.length,
+      sheets: []
+    };
+    
+    sheets.forEach(sheet => {
+      const data = sheet.getDataRange().getValues();
+      const headers = data[0];
+      const rows = data.slice(1);
+      
+      const sheetData = rows.map(row => {
+        const obj = {};
+        headers.forEach((header, index) => {
+          obj[header] = row[index];
+        });
+        return obj;
+      });
+      
+      result.sheets.push({
+        name: sheet.getName(),
+        gid: sheet.getSheetId(),
+        columns: headers,
+        data: sheetData
+      });
+    });
+    
+    return ContentService.createTextOutput(JSON.stringify(result))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({
+      success: false,
+      error: error.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+```
+
+4. **Deploy**:
+   - Clique em **Implantar** > **Nova implantação**
+   - Tipo: **Aplicativo da Web**
+   - Executar como: **Eu**
+   - Quem tem acesso: **Qualquer pessoa**
+   - Copie a URL fornecida
+
+5. **Configure no .env**:
+```bash
+APPS_SCRIPT_URL=https://script.google.com/macros/s/SEU_SCRIPT_ID/exec
 ```
 
 ## 📁 Estrutura do Projeto
 
 ```
-├── api/                    # API para Vercel
-│   └── index.py
-├── templates/              # Templates HTML
-│   └── dashboard.html
-├── Dockerfile             # Container Docker
-├── docker-compose.yml    # Orquestração Docker
-├── vercel.json           # Configuração Vercel
-├── deploy.sh             # Script Docker
-├── deploy-vercel.sh      # Script Vercel
-└── requirements.txt      # Dependências Python
+Projeto Marcelo | Agente de Vendas/
+├── dashboard_app.py           # Aplicação Flask principal
+├── api_openrouter.py          # Cliente API OpenRouter
+├── apps_script_service.py     # Serviço Google Apps Script
+├── requirements.txt           # Dependências Python
+├── vercel.json               # Configuração Vercel
+├── .env.example              # Exemplo de variáveis
+├── .gitignore                # Arquivos ignorados
+├── .vercelignore             # Arquivos ignorados no deploy
+└── templates/
+    └── modern_dashboard.html  # Interface do dashboard
 ```
 
-## 🌐 Endpoints da API
+## 🎯 Funcionalidades
 
-- **`/`** - Página inicial
-- **`/api/data`** - Dados da planilha
-- **`/api/analysis`** - Análise dos dados
-- **`/api/chat`** - Chat com IA
-- **`/api/health`** - Health check
+### Dashboard Principal
+- KPIs em tempo real (Receita, Vendas, Produtos, Regiões)
+- Gráfico de vendas mensais
+- Tabelas interativas por categoria, região e produtos
+- Filtros temporais (3, 6, 12 meses)
 
-## 🧪 Testes
+### Assistente IA
+- **Análise Automática**: Gera insights automáticos dos dados
+- **Chat Interativo**: Faça perguntas sobre seus dados
+- **Respostas Inteligentes**: IA treinada em análise de vendas
+- **Markdown Support**: Respostas formatadas e organizadas
 
+### Integrações
+- Google Sheets via Apps Script
+- OpenRouter AI (modelos gratuitos incluídos)
+- Atualização automática a cada 5 minutos
+
+## 🔧 Desenvolvimento
+
+### Executar localmente
 ```bash
-# Testar API local
-python3 test-vercel.py
-
-# Testar deploy
-python3 test-vercel.py https://seu-projeto.vercel.app
+python dashboard_app.py
 ```
 
-## 📚 Documentação
-
-- **[Docker Deploy](DOCKER_DEPLOY.md)** - Deploy com Docker
-- **[Vercel Deploy](VERCEL_DEPLOY.md)** - Deploy no Vercel
-- **[Deploy Completo](DEPLOY_COMPLETE.md)** - Guia completo
-- **[Quick Start](QUICK_START.md)** - Início rápido
-
-## 🔍 Troubleshooting
-
-### Problemas Comuns
-
-**Docker não inicia:**
+### Testar com porta específica
 ```bash
-# Verificar Docker
-docker --version
-./deploy.sh logs
+python dashboard_app.py --port 8080
 ```
 
-**Vercel não faz deploy:**
+### Atualizar dependências
 ```bash
-# Verificar CLI
-vercel --version
-vercel login
+pip freeze > requirements.txt
 ```
 
-**API não responde:**
-```bash
-# Testar localmente
-python3 api/index.py
-```
+## 🐛 Troubleshooting
 
-## 📈 Performance
+### Erro: "URL do Apps Script não configurada"
+- Verifique se a variável `APPS_SCRIPT_URL` está configurada no `.env`
+- Confirme que a URL está correta e acessível
 
-### Otimizações Implementadas
+### Erro: "Nenhum dado encontrado"
+- Verifique se sua planilha tem dados
+- Confirme que o Apps Script está implantado corretamente
+- Teste a URL do Apps Script no navegador
 
-- ✅ **Docker Alpine** (100MB vs 500MB)
-- ✅ **Serverless** (escala automática)
-- ✅ **Cache inteligente** (dados em memória)
-- ✅ **Health checks** (monitoramento)
-- ✅ **Scripts otimizados** (deploy rápido)
+### Erro de IA: "Modelo não disponível"
+- A aplicação usa fallback local automaticamente
+- Verifique a chave `OPENROUTER_API_KEY` se quiser usar IA externa
 
-### Métricas
+## 📝 License
 
-- **Tempo de Deploy**: 30-60s
-- **Tamanho da Imagem**: ~100MB
-- **Uso de Memória**: 512MB
-- **Tempo de Resposta**: <200ms
+MIT License - veja [LICENSE](LICENSE) para detalhes
 
-## 🤝 Contribuição
+## 👤 Autor
 
-1. Fork o projeto
-2. Crie uma branch (`git checkout -b feature/nova-funcionalidade`)
-3. Commit suas mudanças (`git commit -m 'Adiciona nova funcionalidade'`)
-4. Push para a branch (`git push origin nova-funcionalidade`)
-5. Abra um Pull Request
+**Marcelo Vendas**
+- GitHub: [@Wellychon](https://github.com/Wellychon)
 
-## 📄 Licença
+## 🤝 Contribuindo
 
-Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para detalhes.
-
-## 🆘 Suporte
-
-- **Issues**: [GitHub Issues](https://github.com/Wellychon/assistentedevendas/issues)
-- **Documentação**: [Wiki do Projeto](https://github.com/Wellychon/assistentedevendas/wiki)
-- **Deploy**: [Guia de Deploy](DEPLOY_COMPLETE.md)
-
-## 🎉 Status do Projeto
-
-![Deploy Status](https://img.shields.io/badge/deploy-ready-green)
-![Docker](https://img.shields.io/badge/docker-optimized-blue)
-![Vercel](https://img.shields.io/badge/vercel-serverless-purple)
-![Python](https://img.shields.io/badge/python-3.11-yellow)
+Contribuições são bem-vindas! Sinta-se à vontade para abrir issues ou pull requests.
 
 ---
 
-**Desenvolvido com ❤️ para análise inteligente de vendas**
+**Feito com ❤️ para otimizar análise de vendas**
+

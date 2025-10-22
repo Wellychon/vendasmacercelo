@@ -1999,18 +1999,35 @@ ${topCategories.map(([category, count], index) =>
             const input = document.getElementById('chat-input');
             const message = input.value.trim();
             
-            if (!message) return;
+            if (!message) {
+                showStatus('Digite uma mensagem primeiro', 'error');
+                return;
+            }
+            
+            // Verifica se há dados carregados
+            if (!allData || allData.length === 0) {
+                showStatus('Carregue os dados primeiro clicando em "Atualizar Dados"', 'error');
+                addMessage('⚠️ **Dados não carregados**\n\nPor favor, clique em "Atualizar Dados" no topo da página para carregar as informações da planilha antes de fazer perguntas.', 'bot');
+                return;
+            }
             
             // Adiciona mensagem do usuário
             addMessage(message, 'user');
             input.value = '';
             
-            // Desabilita o botão de envio
+            // Desabilita o input e botão durante o processamento
             const sendButton = document.getElementById('send-message');
             sendButton.disabled = true;
-            sendButton.textContent = 'Enviando...';
+            input.disabled = true;
+            sendButton.textContent = 'Analisando...';
+            
+            // Adiciona mensagem de loading
+            const loadingId = 'loading-' + Date.now();
+            addLoadingMessage(loadingId);
             
             try {
+                console.log('📤 Enviando mensagem para o backend:', message);
+                
                 // Envia mensagem para o backend
                 const response = await fetch('/api/chat', {
                     method: 'POST',
@@ -2020,20 +2037,64 @@ ${topCategories.map(([category, count], index) =>
                     body: JSON.stringify({ message: message })
                 });
                 
+                console.log('📥 Resposta recebida, status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`Erro HTTP: ${response.status}`);
+                }
+                
                 const result = await response.json();
+                console.log('✅ Dados processados:', result);
+                
+                // Remove mensagem de loading
+                removeLoadingMessage(loadingId);
                 
                 if (result.response) {
                     addMessage(result.response, 'bot');
+                    showStatus('Resposta gerada com sucesso!', 'success');
+                } else if (result.error) {
+                    addMessage(`❌ **Erro**: ${result.error}`, 'bot');
+                    showStatus(`Erro: ${result.error}`, 'error');
                 } else {
-                    addMessage('Erro ao processar mensagem. Tente novamente.', 'bot');
+                    addMessage('❌ Erro ao processar mensagem. Tente novamente.', 'bot');
+                    showStatus('Erro ao processar resposta', 'error');
                 }
             } catch (error) {
-                console.error('Erro no chat:', error);
-                addMessage('Erro de conexão. Tente novamente.', 'bot');
+                console.error('❌ Erro no chat:', error);
+                removeLoadingMessage(loadingId);
+                addMessage(`❌ **Erro de conexão**: ${error.message}\n\nVerifique se o servidor está rodando e tente novamente.`, 'bot');
+                showStatus(`Erro de conexão: ${error.message}`, 'error');
             } finally {
-                // Reabilita o botão de envio
+                // Reabilita o input e botão
                 sendButton.disabled = false;
+                input.disabled = false;
                 sendButton.textContent = 'Enviar';
+                input.focus();
+            }
+        }
+        
+        function addLoadingMessage(id) {
+            const messagesContainer = document.getElementById('chat-messages');
+            const loadingDiv = document.createElement('div');
+            loadingDiv.id = id;
+            loadingDiv.className = 'message bot-message';
+            loadingDiv.innerHTML = `
+                <div class="message-avatar">IA</div>
+                <div class="message-content">
+                    <div class="ai-analysis-loading" style="display: flex;">
+                        <div class="spinner"></div>
+                        <span>Analisando seus dados...</span>
+                    </div>
+                </div>
+            `;
+            messagesContainer.appendChild(loadingDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+        
+        function removeLoadingMessage(id) {
+            const loadingMsg = document.getElementById(id);
+            if (loadingMsg) {
+                loadingMsg.remove();
             }
         }
 

@@ -1,93 +1,46 @@
-# Arquivos desnecessários para deploy
+# Arquivos do Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+*.so
 .Python
-env/
 venv/
 .venv/
-pip-log.txt
-pip-delete-this-directory.txt
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.log
-.git/
-.mypy_cache/
-.pytest_cache/
-.hypothesis/
+ENV/
+env/
 
-# Arquivos de desenvolvimento
-*.md
-!README.md
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
 
-# Arquivos de backup
-*.bak
-*.backup
-*.old
-
-# Logs
-logs/
-*.log
-
-# Arquivos temporários
-*.tmp
-*.temp
+# OS
 .DS_Store
 Thumbs.db
 
-# Arquivos de teste
+# Logs
+*.log
+logs/
+
+# Testes
 test_*.py
 *_test.py
 tests/
 
-# Arquivos de deploy antigos
-deploy.sh
-deploy-vercel.sh
-backup.sh
-cleanup.sh
-deploy-vercel-optimized.sh
+# Temporários
+*.tmp
+temp/
+tmp/
 
-# Docker
-Dockerfile
-docker-compose*.yml
-.dockerignore
-
-# Arquivos específicos do projeto que não são necessários
-check_api.py
-setup_api.py
-setup_openrouter.py
-test_apps_script.py
-test_chatbot.py
-test-vercel.py
-
-# Arquivos de documentação
-DEPLOY_VERCEL.md
-DEPLOY_COMPLETE.md
-DEPLOY.md
-README_API.md
-README_DOCKER_SIMPLE.md
-DOCKER_DEPLOY.md
-VERCEL_DEPLOY.md
-QUICK_START.md
-TROUBLESHOOTING.md
-
-# Arquivos de configuração desnecessários
-env.example
-env.vercel
-vercel_simple.json
-vercel-env.txt
-
-# Arquivos de backup e temporários
+# Arquivos sensíveis
+.env
+credentials.json
 token.json
-*.sh
+*.key
+apps_script_url.txt
+
+# Git
+.git/
+.gitignore
+

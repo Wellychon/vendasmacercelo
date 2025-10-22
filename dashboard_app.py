@@ -3,11 +3,15 @@ import json
 from datetime import datetime
 import threading
 import time
+import os
 from apps_script_service import apps_script_service
 from api_openrouter import consultar_ia
-import pandas as pd
 
 app = Flask(__name__)
+
+# Configuração para Vercel
+app.config['JSON_AS_ASCII'] = False
+app.config['JSON_SORT_KEYS'] = False
 
 # Cache para os dados
 cached_data = None
@@ -22,7 +26,7 @@ def update_data():
         try:
             print("Atualizando dados da planilha...")
             data = apps_script_service.get_latest_data()
-            
+         
             if data is not None:
                 if isinstance(data, dict):
                     # Múltiplas guias
@@ -72,165 +76,84 @@ def get_analysis():
 def analyze_sales_data_detailed(data):
     """Faz análise detalhada dos dados de vendas"""
     try:
-        # Converte para DataFrame para análise mais fácil
-        df = pd.DataFrame(data)
-        
-        # Análise de receita total
+        # Análise simples sem pandas para reduzir tamanho
+        total_records = len(data)
         total_revenue = 0
-        if 'Receita Total' in df.columns:
-            df['Receita Total'] = pd.to_numeric(df['Receita Total'].astype(str).str.replace(',', '.').str.replace('R$', '').str.strip(), errors='coerce')
-            total_revenue = df['Receita Total'].sum()
+        categories = {}
+        regions = {}
+        products = {}
         
-        # Análise por categoria
-        category_analysis = {}
-        if 'Categoria' in df.columns:
-            category_analysis = df.groupby('Categoria').agg({
-                'Receita Total': ['sum', 'count', 'mean'] if 'Receita Total' in df.columns else ['count'],
-                'Quantidade': 'sum' if 'Quantidade' in df.columns else 'count'
-            }).round(2)
-        
-        # Análise por região
-        region_analysis = {}
-        if 'Região' in df.columns:
-            region_analysis = df.groupby('Região').agg({
-                'Receita Total': ['sum', 'count', 'mean'] if 'Receita Total' in df.columns else ['count'],
-                'Quantidade': 'sum' if 'Quantidade' in df.columns else 'count'
-            }).round(2)
-        
-        # Análise por produto
-        product_analysis = {}
-        if 'Produto' in df.columns:
-            product_analysis = df.groupby('Produto').agg({
-                'Receita Total': ['sum', 'count', 'mean'] if 'Receita Total' in df.columns else ['count'],
-                'Quantidade': 'sum' if 'Quantidade' in df.columns else 'count'
-            }).round(2)
-        
-        # Análise temporal (se houver coluna de data)
-        temporal_analysis = {}
-        if 'Data' in df.columns:
-            df['Data'] = pd.to_datetime(df['Data'], errors='coerce')
-            df['Mes'] = df['Data'].dt.to_period('M')
-            temporal_analysis = df.groupby('Mes').agg({
-                'Receita Total': ['sum', 'count'] if 'Receita Total' in df.columns else ['count'],
-                'Quantidade': 'sum' if 'Quantidade' in df.columns else 'count'
-            }).round(2)
+        # Análise básica dos dados
+        for row in data:
+            # Receita
+            try:
+                revenue = float(str(row.get('Receita Total', '0')).replace(',', '.').replace('R$', '').strip()) or 0
+                total_revenue += revenue
+            except (ValueError, TypeError):
+                pass
+            
+            # Categorias
+            category = row.get('Categoria', 'Outros')
+            if category not in categories:
+                categories[category] = {'count': 0, 'revenue': 0}
+            categories[category]['count'] += 1
+            categories[category]['revenue'] += revenue
+            
+            # Regiões
+            region = row.get('Região', 'Outros')
+            if region not in regions:
+                regions[region] = {'count': 0, 'revenue': 0}
+            regions[region]['count'] += 1
+            regions[region]['revenue'] += revenue
+            
+            # Produtos
+            product = row.get('Produto', 'Outros')
+            if product not in products:
+                products[product] = {'count': 0, 'revenue': 0}
+            products[product]['count'] += 1
+            products[product]['revenue'] += revenue
         
         # Top performers
-        top_categories = category_analysis.sort_values(('Receita Total', 'sum'), ascending=False).head(3) if category_analysis.size > 0 else {}
-        top_regions = region_analysis.sort_values(('Receita Total', 'sum'), ascending=False).head(3) if region_analysis.size > 0 else {}
-        top_products = product_analysis.sort_values(('Receita Total', 'sum'), ascending=False).head(5) if product_analysis.size > 0 else {}
+        top_categories = sorted(categories.items(), key=lambda x: x[1]['revenue'], reverse=True)[:3]
+        top_regions = sorted(regions.items(), key=lambda x: x[1]['revenue'], reverse=True)[:3]
+        top_products = sorted(products.items(), key=lambda x: x[1]['revenue'], reverse=True)[:5]
         
-        # Gera análise estruturada
+        # Gera análise estruturada simplificada
         analysis = f"""# Principais Insights de Vendas - Análise Detalhada
 
 ## Identificação de tendências de vendas
-**Dados analisados**: {len(data):,} transações processadas
+**Dados analisados**: {total_records:,} transações processadas
 **Receita total**: R$ {total_revenue:,.2f}
-**Ticket médio**: R$ {total_revenue/len(data):,.2f}
+**Ticket médio**: R$ {total_revenue/total_records:,.2f}
 
-### Performance por Mês (Últimos 3 meses):
+## Top 3 Categorias por Receita:
 """
         
-        if temporal_analysis.size > 0:
-            recent_months = temporal_analysis.tail(3)
-            for month, row in recent_months.iterrows():
-                revenue = row[('Receita Total', 'sum')] if ('Receita Total', 'sum') in row else 0
-                count = row[('Receita Total', 'count')] if ('Receita Total', 'count') in row else 0
-                analysis += f"- **{month}**: R$ {revenue:,.2f} em {count} vendas\n"
-        else:
-            analysis += "- Dados temporais não disponíveis para análise de tendências\n"
+        for i, (category, data) in enumerate(top_categories, 1):
+            percentage = (data['revenue'] / total_revenue * 100) if total_revenue > 0 else 0
+            analysis += f"{i}. **{category}**: R$ {data['revenue']:,.2f} ({percentage:.1f}% do total) - {data['count']} vendas\n"
         
         analysis += f"""
-## Segmentação de clientes
-**Total de clientes únicos**: {df['Cliente'].nunique() if 'Cliente' in df.columns else 'N/A'}
-**Regiões ativas**: {df['Região'].nunique() if 'Região' in df.columns else 'N/A'}
-
-### Top 3 Regiões por Receita:
+## Top 3 Regiões por Receita:
 """
         
-        if top_regions.size > 0:
-            for i, (region, row) in enumerate(top_regions.iterrows(), 1):
-                revenue = row[('Receita Total', 'sum')] if ('Receita Total', 'sum') in row else 0
-                count = row[('Receita Total', 'count')] if ('Receita Total', 'count') in row else 0
-                percentage = (revenue / total_revenue * 100) if total_revenue > 0 else 0
-                analysis += f"{i}. **{region}**: R$ {revenue:,.2f} ({percentage:.1f}% do total) - {count} vendas\n"
-        else:
-            analysis += "- Dados de região não disponíveis\n"
+        for i, (region, data) in enumerate(top_regions, 1):
+            percentage = (data['revenue'] / total_revenue * 100) if total_revenue > 0 else 0
+            analysis += f"{i}. **{region}**: R$ {data['revenue']:,.2f} ({percentage:.1f}% do total) - {data['count']} vendas\n"
         
         analysis += f"""
-## Produtos com melhor e pior desempenho
-**Total de produtos únicos**: {df['Produto'].nunique() if 'Produto' in df.columns else 'N/A'}
-
-### Top 5 Produtos por Receita:
+## Top 5 Produtos por Receita:
 """
         
-        if top_products.size > 0:
-            for i, (product, row) in enumerate(top_products.iterrows(), 1):
-                revenue = row[('Receita Total', 'sum')] if ('Receita Total', 'sum') in row else 0
-                count = row[('Receita Total', 'count')] if ('Receita Total', 'count') in row else 0
-                avg_ticket = row[('Receita Total', 'mean')] if ('Receita Total', 'mean') in row else 0
-                analysis += f"{i}. **{product}**: R$ {revenue:,.2f} ({count} vendas, ticket médio R$ {avg_ticket:,.2f})\n"
-        else:
-            analysis += "- Dados de produto não disponíveis\n"
+        for i, (product, data) in enumerate(top_products, 1):
+            avg_ticket = data['revenue'] / data['count'] if data['count'] > 0 else 0
+            analysis += f"{i}. **{product}**: R$ {data['revenue']:,.2f} ({data['count']} vendas, ticket médio R$ {avg_ticket:,.2f})\n"
         
         analysis += f"""
-## Avaliação da equipe de vendas
-**Vendedores únicos**: {df['Vendedor'].nunique() if 'Vendedor' in df.columns else 'N/A'}
-
-### Performance por Categoria:
-"""
-        
-        if top_categories.size > 0:
-            for i, (category, row) in enumerate(top_categories.iterrows(), 1):
-                revenue = row[('Receita Total', 'sum')] if ('Receita Total', 'sum') in row else 0
-                count = row[('Receita Total', 'count')] if ('Receita Total', 'count') in row else 0
-                percentage = (revenue / total_revenue * 100) if total_revenue > 0 else 0
-                analysis += f"{i}. **{category}**: R$ {revenue:,.2f} ({percentage:.1f}% do total) - {count} vendas\n"
-        else:
-            analysis += "- Dados de categoria não disponíveis\n"
-        
-        analysis += f"""
-## Análise geográfica de vendas
-**Concentração geográfica**: {len(region_analysis)} regiões diferentes
-**Receita média por região**: R$ {total_revenue/len(region_analysis):,.2f} (se distribuída igualmente)
-
-### Oportunidades de Expansão:
-- Focar nas regiões de maior performance
-- Investigar regiões com baixo volume de vendas
-- Desenvolver estratégias específicas por região
-
-## Taxa de conversão e ciclo de venda
-**Vendas por dia**: {len(data)/30:.1f} vendas/dia (média)
-**Receita por dia**: R$ {total_revenue/30:,.2f}/dia (média)
-
-### Recomendações Operacionais:
-- Otimizar processo de vendas para aumentar volume diário
-- Implementar follow-up sistemático para melhorar conversão
-- Analisar gargalos no processo de vendas
-
-## Comparação com metas
-**Meta sugerida baseada nos dados**: R$ {total_revenue * 1.2:,.2f} (+20% de crescimento)
-**Vendas necessárias para meta**: {len(data) * 1.2:,.0f} transações
-
-### Ações para Atingir Meta:
-- Aumentar 20% no volume de vendas
-- Melhorar ticket médio em 10%
-- Focar nas categorias de maior performance
-
-## Sazonalidade e oportunidades escondidas
-**Período de análise**: {df['Data'].min().strftime('%d/%m/%Y') if 'Data' in df.columns and not df['Data'].isna().all() else 'N/A'} a {df['Data'].max().strftime('%d/%m/%Y') if 'Data' in df.columns and not df['Data'].isna().all() else 'N/A'}
-
-### Padrões Identificados:
-- Analisar variações mensais para identificar sazonalidade
-- Identificar produtos com potencial de crescimento
-- Desenvolver campanhas sazonais específicas
-
----
-
-### Resumo Executivo dos Dados
-- **Total de Transações**: {len(data):,}
+## Resumo Executivo dos Dados
+- **Total de Transações**: {total_records:,}
 - **Receita Total**: R$ {total_revenue:,.2f}
-- **Ticket Médio**: R$ {total_revenue/len(data):,.2f}
+- **Ticket Médio**: R$ {total_revenue/total_records:,.2f}
 - **Período**: {last_update if last_update else 'Dados mais recentes'}
 - **Fonte**: Planilha de vendas integrada
 
@@ -443,42 +366,92 @@ def chat_with_ai():
         data = request.get_json()
         user_message = data.get('message', '')
         
+        print(f"💬 Nova mensagem recebida: {user_message[:100]}...")
+        
         if not user_message:
+            print("❌ Mensagem vazia recebida")
             return jsonify({
                 'error': 'Mensagem não fornecida'
             }), 400
         
-        # Prepara contexto dos dados para a IA
-        context = prepare_data_context()
+        # Garante que os dados estejam carregados
+        if cached_data is None:
+            print("⚠️ Cache vazio, carregando dados...")
+            update_data()
         
-        # Cria prompt contextualizado para a IA
-        prompt = f"""Você é um assistente especializado em análise de dados de vendas. 
+        # Verifica se temos dados após tentar carregar
+        if cached_data is None:
+            print("❌ Nenhum dado disponível após tentativa de carregamento")
+            return jsonify({
+                'response': """# ⚠️ Dados Não Disponíveis
 
-DADOS DISPONÍVEIS:
+**Nenhum dado foi carregado da planilha.**
+
+## **Para Resolver**
+1. Clique em **"Atualizar Dados"** no topo da página
+2. Aguarde o carregamento dos dados
+3. Tente fazer sua pergunta novamente
+
+## **Verificações**
+- ✓ Conexão com Google Sheets configurada?
+- ✓ URL do Apps Script configurada no .env?
+- ✓ Planilha com dados disponíveis?
+
+*Configure a conexão primeiro para usar o chat com dados reais!*"""
+            }), 200
+        
+        print(f"✅ Dados em cache: {len(cached_data) if isinstance(cached_data, dict) else 'N/A'} guias")
+        
+        # Prepara contexto dos dados para a IA
+        print("🔄 Preparando contexto dos dados...")
+        context = prepare_data_context()
+        print(f"✅ Contexto preparado: {len(context)} caracteres")
+        
+        # Calcula total de registros para o prompt
+        total_records = 0
+        if cached_data:
+            if isinstance(cached_data, dict):
+                total_records = sum(sheet['total_registros'] for sheet in cached_data.values())
+            else:
+                total_records = len(cached_data)
+        
+        # Mensagem do sistema com contexto dos dados
+        system_message = f"""Você é um analista de dados de vendas especializado com acesso completo aos dados reais da empresa.
+
+DADOS REAIS DA EMPRESA:
 {context}
 
-PERGUNTA DO USUÁRIO: {user_message}
+INSTRUÇÕES IMPORTANTES:
+- Você tem acesso a {total_records:,} registros reais de vendas
+- Use APENAS os dados fornecidos acima para suas análises
+- Seja extremamente específico com números, percentuais e valores EXATOS dos dados
+- Identifique padrões, tendências e oportunidades REAIS nos dados fornecidos
+- Responda em português brasileiro claro e profissional
+- Use formatação Markdown para organizar suas respostas (títulos, listas, negrito)
+- Cite números e métricas específicas dos dados reais
+- Sugira ações práticas baseadas nos dados fornecidos
+- Compare performances entre produtos, regiões e períodos usando os dados reais
+- Destaque insights únicos identificados nos dados"""
 
-INSTRUÇÕES:
-- Responda em português brasileiro
-- Use os dados fornecidos para dar insights específicos
-- Seja preciso e baseado nos dados reais
-- Use formatação Markdown para organizar a resposta
-- Inclua números específicos quando relevante
-- Sugira ações práticas baseadas nos dados
+        # Pergunta do usuário
+        user_prompt = f"""PERGUNTA: {user_message}
 
-RESPONDA:"""
+Analise os dados fornecidos e responda com base nos números REAIS e específicos. Inclua métricas, percentuais e comparações concretas."""
+        
+        print(f"🤖 Enviando para IA... (contexto: {len(system_message)} chars, prompt: {len(user_prompt)} chars)")
         
         # Tenta consultar a IA real, com fallback para análise local
         try:
-            from api_openrouter import consultar_ia
-            ai_response = consultar_ia(prompt)
-            print("✅ Resposta da IA externa obtida")
+            ai_response = consultar_ia(user_prompt, system_message=system_message)
+            print(f"✅ Resposta da IA externa obtida: {len(ai_response)} caracteres")
         except Exception as e:
             print(f"⚠️ IA externa indisponível: {e}")
             print("🔄 Usando análise local inteligente...")
             # Fallback para análise local inteligente
             ai_response = generate_local_ai_response(user_message, context)
+            print(f"✅ Resposta local gerada: {len(ai_response)} caracteres")
+        
+        print(f"📤 Enviando resposta para o frontend")
         
         return jsonify({
             'response': ai_response,
@@ -486,13 +459,16 @@ RESPONDA:"""
         })
         
     except Exception as e:
+        print(f"❌ ERRO no chat endpoint: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'error': f'Erro ao processar mensagem: {str(e)}'
         }), 500
 
 
 def prepare_data_context():
-    """Prepara contexto dos dados para a IA"""
+    """Prepara contexto detalhado dos dados para a IA"""
     try:
         if not cached_data:
             return "Nenhum dado disponível para análise."
@@ -509,14 +485,17 @@ def prepare_data_context():
         if not all_data:
             return "Nenhum dado disponível para análise."
         
-        # Calcula métricas básicas
+        # Análise detalhada dos dados
         total_records = len(all_data)
         total_revenue = 0
-        product_counts = {}
-        region_counts = {}
-        category_counts = {}
-        vendor_counts = {}
+        total_quantity = 0
+        product_data = {}
+        region_data = {}
+        category_data = {}
+        monthly_data = {}
+        price_analysis = {}
         
+        # Processa cada registro
         for row in all_data:
             # Receita
             try:
@@ -525,55 +504,171 @@ def prepare_data_context():
                 revenue = 0
             total_revenue += revenue
             
-            # Produtos
+            # Quantidade
+            try:
+                quantity = int(row.get('Quantidade', 0)) or 0
+            except (ValueError, TypeError):
+                quantity = 0
+            total_quantity += quantity
+            
+            # Preço unitário
+            try:
+                unit_price = float(str(row.get('Preço Unitário', '0')).replace(',', '.').replace('R$', '').strip()) or 0
+            except (ValueError, TypeError):
+                unit_price = 0
+            
+            # Produtos (com receita e quantidade)
             product = row.get('Produto', 'Outros')
-            product_counts[product] = product_counts.get(product, 0) + 1
+            if product not in product_data:
+                product_data[product] = {'sales': 0, 'revenue': 0, 'quantity': 0, 'avg_price': 0, 'category': ''}
+            product_data[product]['sales'] += 1
+            product_data[product]['revenue'] += revenue
+            product_data[product]['quantity'] += quantity
+            product_data[product]['category'] = row.get('Categoria', 'Outros')
             
-            # Regiões
+            # Regiões (com receita e quantidade)
             region = row.get('Região', 'Outros')
-            region_counts[region] = region_counts.get(region, 0) + 1
+            if region not in region_data:
+                region_data[region] = {'sales': 0, 'revenue': 0, 'quantity': 0}
+            region_data[region]['sales'] += 1
+            region_data[region]['revenue'] += revenue
+            region_data[region]['quantity'] += quantity
             
-            # Categorias
+            # Categorias (com receita e quantidade)
             category = row.get('Categoria', 'Outros')
-            category_counts[category] = category_counts.get(category, 0) + 1
+            if category not in category_data:
+                category_data[category] = {'sales': 0, 'revenue': 0, 'quantity': 0, 'products': set()}
+            category_data[category]['sales'] += 1
+            category_data[category]['revenue'] += revenue
+            category_data[category]['quantity'] += quantity
+            category_data[category]['products'].add(product)
             
-            # Vendedores
-            vendor = row.get('Vendedor', 'Outros')
-            vendor_counts[vendor] = vendor_counts.get(vendor, 0) + 1
+            # Análise mensal
+            try:
+                date_str = row.get('Data', '')
+                if 'T' in date_str:
+                    month = date_str.split('T')[0][:7]  # YYYY-MM
+                else:
+                    month = date_str[:7] if len(date_str) >= 7 else '2025-01'
+                
+                if month not in monthly_data:
+                    monthly_data[month] = {'sales': 0, 'revenue': 0, 'quantity': 0}
+                monthly_data[month]['sales'] += 1
+                monthly_data[month]['revenue'] += revenue
+                monthly_data[month]['quantity'] += quantity
+            except:
+                pass
+            
+            # Análise de preços
+            if unit_price > 0:
+                price_range = f"R$ {int(unit_price//50)*50}-{int(unit_price//50)*50+49}"
+                if price_range not in price_analysis:
+                    price_analysis[price_range] = {'count': 0, 'revenue': 0}
+                price_analysis[price_range]['count'] += 1
+                price_analysis[price_range]['revenue'] += revenue
         
+        # Calcula métricas finais
         avg_ticket = total_revenue / total_records if total_records > 0 else 0
+        avg_quantity = total_quantity / total_records if total_records > 0 else 0
         
-        # Top performers
-        top_products = sorted(product_counts.items(), key=lambda x: x[1], reverse=True)[:5]
-        top_regions = sorted(region_counts.items(), key=lambda x: x[1], reverse=True)[:3]
-        top_categories = sorted(category_counts.items(), key=lambda x: x[1], reverse=True)[:3]
-        top_vendors = sorted(vendor_counts.items(), key=lambda x: x[1], reverse=True)[:3]
+        # Top performers com receita
+        top_products = sorted(product_data.items(), key=lambda x: x[1]['revenue'], reverse=True)[:10]
+        top_regions = sorted(region_data.items(), key=lambda x: x[1]['revenue'], reverse=True)[:5]
+        top_categories = sorted(category_data.items(), key=lambda x: x[1]['revenue'], reverse=True)[:5]
+        top_months = sorted(monthly_data.items(), key=lambda x: x[1]['revenue'], reverse=True)[:6]
         
-        # Cria contexto estruturado
+        # Converte sets para contagem
+        for cat_data in category_data.values():
+            cat_data['products'] = len(cat_data['products'])
+        
+        # Cria contexto super detalhado
         context = f"""
-RESUMO GERAL:
+=== DADOS COMPLETOS DA PLANILHA DE VENDAS ===
+
+RESUMO EXECUTIVO:
 - Total de transações: {total_records:,}
 - Receita total: R$ {total_revenue:,.2f}
+- Quantidade total vendida: {total_quantity:,} unidades
 - Ticket médio: R$ {avg_ticket:,.2f}
-- Última atualização: {last_update if last_update else 'N/A'}
+- Quantidade média por venda: {avg_quantity:.1f} unidades
+- Período: {last_update if last_update else 'Dados mais recentes'}
+- Fonte: {len(cached_data) if isinstance(cached_data, dict) else 1} guias de planilha
 
-TOP PRODUTOS POR VENDAS:
-{chr(10).join([f"- {product}: {count} vendas" for product, count in top_products])}
+=== ANÁLISE POR PRODUTOS (TOP 10) ===
+"""
+        
+        for i, (product, data) in enumerate(top_products, 1):
+            avg_price = data['revenue'] / data['quantity'] if data['quantity'] > 0 else 0
+            context += f"{i}. {product} ({data['category']}):\n"
+            context += f"   - Vendas: {data['sales']} transações\n"
+            context += f"   - Receita: R$ {data['revenue']:,.2f}\n"
+            context += f"   - Quantidade: {data['quantity']:,} unidades\n"
+            context += f"   - Preço médio: R$ {avg_price:,.2f}\n\n"
+        
+        context += f"""
+=== ANÁLISE POR REGIÕES (TOP 5) ===
+"""
+        
+        for i, (region, data) in enumerate(top_regions, 1):
+            percentage = (data['revenue'] / total_revenue * 100) if total_revenue > 0 else 0
+            context += f"{i}. {region}:\n"
+            context += f"   - Vendas: {data['sales']} transações ({data['sales']/total_records*100:.1f}%)\n"
+            context += f"   - Receita: R$ {data['revenue']:,.2f} ({percentage:.1f}%)\n"
+            context += f"   - Quantidade: {data['quantity']:,} unidades\n"
+            context += f"   - Ticket médio: R$ {data['revenue']/data['sales']:,.2f}\n\n"
+        
+        context += f"""
+=== ANÁLISE POR CATEGORIAS (TOP 5) ===
+"""
+        
+        for i, (category, data) in enumerate(top_categories, 1):
+            percentage = (data['revenue'] / total_revenue * 100) if total_revenue > 0 else 0
+            context += f"{i}. {category}:\n"
+            context += f"   - Vendas: {data['sales']} transações\n"
+            context += f"   - Receita: R$ {data['revenue']:,.2f} ({percentage:.1f}%)\n"
+            context += f"   - Quantidade: {data['quantity']:,} unidades\n"
+            context += f"   - Produtos únicos: {data['products']}\n"
+            context += f"   - Ticket médio: R$ {data['revenue']/data['sales']:,.2f}\n\n"
+        
+        context += f"""
+=== ANÁLISE TEMPORAL (TOP 6 MESES) ===
+"""
+        
+        for month, data in top_months:
+            percentage = (data['revenue'] / total_revenue * 100) if total_revenue > 0 else 0
+            context += f"- {month}:\n"
+            context += f"  - Vendas: {data['sales']} transações\n"
+            context += f"  - Receita: R$ {data['revenue']:,.2f} ({percentage:.1f}%)\n"
+            context += f"  - Quantidade: {data['quantity']:,} unidades\n"
+            context += f"  - Ticket médio: R$ {data['revenue']/data['sales']:,.2f}\n\n"
+        
+        context += f"""
+=== DADOS DETALHADOS DISPONÍVEIS ===
+- Produtos únicos: {len(product_data)}
+- Regiões ativas: {len(region_data)}
+- Categorias: {len(category_data)}
+- Meses com dados: {len(monthly_data)}
+- Faixas de preço: {len(price_analysis)}
 
-TOP REGIÕES POR VENDAS:
-{chr(10).join([f"- {region}: {count} vendas" for region, count in top_regions])}
+=== ESTRUTURA DOS DADOS ===
+Cada transação contém:
+- Data da venda
+- ID da transação
+- Produto vendido
+- Categoria do produto
+- Região da venda
+- Quantidade vendida
+- Preço unitário
+- Receita total calculada
 
-TOP CATEGORIAS POR VENDAS:
-{chr(10).join([f"- {category}: {count} vendas" for category, count in top_categories])}
-
-TOP VENDEDORES POR VENDAS:
-{chr(10).join([f"- {vendor}: {count} vendas" for vendor, count in top_vendors])}
-
-DADOS DETALHADOS DISPONÍVEIS:
-- {len(product_counts)} produtos únicos
-- {len(region_counts)} regiões ativas
-- {len(category_counts)} categorias
-- {len(vendor_counts)} vendedores
+=== INSIGHTS DISPONÍVEIS ===
+- Análise de sazonalidade mensal
+- Performance por produto e categoria
+- Concentração geográfica de vendas
+- Análise de ticket médio por segmento
+- Identificação de produtos top performers
+- Oportunidades de crescimento por região
+- Análise de mix de produtos por categoria
 """
         
         return context
@@ -650,21 +745,68 @@ def generate_local_ai_response(user_message, context):
     try:
         message_lower = user_message.lower()
         
-        # Extrai dados do contexto
+        # Extrai dados estruturados do contexto
         lines = context.split('\n')
         total_records = 0
         total_revenue = 0
         avg_ticket = 0
+        total_quantity = 0
+        
+        # Coleta informações de produtos, regiões e categorias do contexto
+        products_section = []
+        regions_section = []
+        categories_section = []
+        months_section = []
+        
+        current_section = None
         
         for line in lines:
+            # Extrai métricas básicas
             if 'Total de transações:' in line:
-                total_records = int(line.split(':')[1].replace(',', '').strip())
-            elif 'Receita total:' in line:
-                revenue_str = line.split(':')[1].replace('R$', '').replace(',', '').strip()
-                total_revenue = float(revenue_str)
-            elif 'Ticket médio:' in line:
-                ticket_str = line.split(':')[1].replace('R$', '').replace(',', '').strip()
-                avg_ticket = float(ticket_str)
+                try:
+                    total_records = int(line.split(':')[1].replace(',', '').replace('.', '').strip())
+                except:
+                    pass
+            elif 'Receita total: R$' in line:
+                try:
+                    revenue_str = line.split('R$')[1].replace(',', '').replace('.', '').strip()
+                    total_revenue = float(revenue_str)
+                except:
+                    pass
+            elif 'Ticket médio: R$' in line:
+                try:
+                    ticket_str = line.split('R$')[1].replace(',', '').replace('.', '').strip()
+                    avg_ticket = float(ticket_str)
+                except:
+                    pass
+            elif 'Quantidade total vendida:' in line:
+                try:
+                    qty_str = line.split(':')[1].replace(',', '').replace('.', '').split()[0].strip()
+                    total_quantity = int(qty_str)
+                except:
+                    pass
+            
+            # Identifica seções
+            if 'ANÁLISE POR PRODUTOS' in line:
+                current_section = 'products'
+            elif 'ANÁLISE POR REGIÕES' in line:
+                current_section = 'regions'
+            elif 'ANÁLISE POR CATEGORIAS' in line:
+                current_section = 'categories'
+            elif 'ANÁLISE TEMPORAL' in line:
+                current_section = 'months'
+            elif line.strip().startswith('==='):
+                current_section = None
+            
+            # Coleta dados das seções
+            if current_section == 'products' and line.strip() and not line.startswith('==='):
+                products_section.append(line.strip())
+            elif current_section == 'regions' and line.strip() and not line.startswith('==='):
+                regions_section.append(line.strip())
+            elif current_section == 'categories' and line.strip() and not line.startswith('==='):
+                categories_section.append(line.strip())
+            elif current_section == 'months' and line.strip() and not line.startswith('==='):
+                months_section.append(line.strip())
         
         # Se não temos dados carregados, retorna mensagem apropriada
         if total_records == 0:
@@ -687,76 +829,100 @@ def generate_local_ai_response(user_message, context):
 *Carregue os dados primeiro e depois faça suas perguntas!*"""
         
         # Análise contextual inteligente com dados reais
-        if any(word in message_lower for word in ['vendas', 'venda', 'performance', 'resultado', 'resumo']):
-            # Analisa dados reais se disponíveis
-            real_analysis = analyze_real_data()
+        if any(word in message_lower for word in ['vendas', 'venda', 'performance', 'resultado', 'resumo', 'geral']):
+            # Extrai primeiros produtos e regiões
+            top_products_text = '\n'.join(products_section[:15]) if products_section else "Dados sendo processados..."
+            top_regions_text = '\n'.join(regions_section[:10]) if regions_section else "Dados sendo processados..."
             
-            return f"""# 📊 Resumo de Vendas Atual
+            return f"""# 📊 Resumo de Vendas - Análise Baseada em Dados Reais
 
 ## **Métricas Principais**
 - **Total de Transações**: {total_records:,}
 - **Receita Total**: R$ {total_revenue:,.2f}
 - **Ticket Médio**: R$ {avg_ticket:,.2f}
+- **Quantidade Vendida**: {total_quantity:,} unidades
 
-{real_analysis}
+## **Top Produtos (Dados Reais)**
+{top_products_text[:500]}
+
+## **Principais Regiões (Dados Reais)**
+{top_regions_text[:400]}
 
 ## **Insights Estratégicos**
-Com base nos seus dados, posso identificar padrões importantes e oportunidades de crescimento. Sua base de {total_records:,} transações oferece uma visão robusta do desempenho.
+Com base na análise de **{total_records:,} transações reais**, identificamos:
 
-## **Análise de Performance**
-- **Receita por Transação**: R$ {avg_ticket:,.2f}
-- **Volume de Dados**: {total_records:,} registros analisados
-- **Base Sólida**: Dados suficientes para análises confiáveis
+- **Volume**: Base sólida de dados para análises confiáveis
+- **Receita Média**: R$ {avg_ticket:,.2f} por transação
+- **Distribuição**: Múltiplas categorias e regiões ativas
 
-## **Próximos Passos Recomendados**
-- Analisar tendências mensais para identificar sazonalidade
-- Investigar produtos com maior potencial de crescimento
-- Avaliar oportunidades de expansão geográfica
+## **Recomendações Baseadas nos Dados**
+1. **Foco em Performance**: Produtos top estão claramente identificados nos dados
+2. **Expansão Geográfica**: Regiões com maior volume merecem atenção especial
+3. **Otimização de Ticket**: Oportunidades de aumentar valor médio por venda
 
-*Que aspecto específico gostaria de investigar mais profundamente?*"""
+*Pergunte sobre produtos, regiões ou categorias específicas para análises detalhadas!*"""
 
         elif any(word in message_lower for word in ['produto', 'produtos', 'item', 'itens', 'top']):
-            return f"""# 🛍️ Análise de Produtos
+            # Extrai dados de produtos do contexto
+            products_info = '\n'.join(products_section[:20]) if products_section else "Carregando dados de produtos..."
+            
+            return f"""# 🛍️ Análise de Produtos - Dados Reais
 
 ## **Performance de Produtos**
-Com base nos seus dados de {total_records:,} transações, posso analisar o desempenho dos produtos e identificar oportunidades.
+Análise baseada em **{total_records:,} transações reais** da sua base de dados.
 
-## **Dados Disponíveis**
+## **Top Produtos por Performance**
+{products_info[:800]}
+
+## **Métricas Globais**
 - **Total de Transações**: {total_records:,}
 - **Receita Total**: R$ {total_revenue:,.2f}
 - **Ticket Médio**: R$ {avg_ticket:,.2f}
+- **Quantidade Total**: {total_quantity:,} unidades
 
-## **Insights Disponíveis**
-- **Ranking de Produtos**: Top performers por volume de vendas
-- **Análise de Categorias**: Performance por segmento
-- **Oportunidades de Crescimento**: Produtos com potencial
-- **Análise de Ticket Médio**: Valor por produto
+## **Insights dos Dados Reais**
+- **Rankings Identificados**: Produtos com maior receita e volume
+- **Categorias Analisadas**: Performance por segmento
+- **Preços Médios**: Calculados com base nas transações reais
+- **Oportunidades**: Produtos com alto potencial identificados
 
 ## **Recomendações Estratégicas**
-- Focar nos produtos de maior performance
-- Investigar produtos com baixo volume mas alto ticket
-- Desenvolver estratégias específicas por categoria
+1. **Produtos Top**: Focar nos itens de maior receita
+2. **Mix de Produtos**: Balancear volume e ticket médio
+3. **Categorias**: Desenvolver estratégias específicas por segmento
 
-*Gostaria de ver o ranking completo de produtos ou focar em alguma categoria específica?*"""
+*Pergunte sobre produtos ou categorias específicas para detalhes!*"""
 
         elif any(word in message_lower for word in ['região', 'regiões', 'geográfico', 'localização', 'onde']):
-            return f"""# 🌍 Análise Geográfica
+            # Extrai dados de regiões do contexto
+            regions_info = '\n'.join(regions_section[:15]) if regions_section else "Carregando dados geográficos..."
+            
+            return f"""# 🌍 Análise Geográfica - Dados Reais
 
 ## **Distribuição Geográfica**
-Sua operação abrange múltiplas regiões, oferecendo oportunidades de análise e expansão.
+Análise baseada em **{total_records:,} transações reais** distribuídas por região.
 
-## **Insights Geográficos**
-- **Concentração de Vendas**: Identificar regiões de maior performance
-- **Oportunidades de Expansão**: Regiões com potencial de crescimento
-- **Análise de Penetração**: Cobertura e densidade por região
-- **Estratégias Regionais**: Abordagens específicas por localização
+## **Top Regiões por Performance**
+{regions_info[:700]}
 
-## **Recomendações**
-- Focar recursos nas regiões de maior performance
-- Desenvolver estratégias específicas para cada mercado
-- Identificar regiões com potencial de crescimento
+## **Métricas Geográficas Globais**
+- **Total de Transações**: {total_records:,}
+- **Receita Total**: R$ {total_revenue:,.2f}
+- **Ticket Médio**: R$ {avg_ticket:,.2f}
+- **Múltiplas Regiões**: Operação nacional/regional ativa
 
-*Qual região gostaria de analisar em detalhes?*"""
+## **Insights Geográficos dos Dados**
+- **Concentração Identificada**: Regiões de maior performance nos dados
+- **Performance Regional**: Rankings calculados com dados reais
+- **Oportunidades de Expansão**: Regiões com potencial baseado em volume
+- **Estratégias Regionais**: Dados suportam abordagens específicas
+
+## **Recomendações Baseadas nos Dados**
+1. **Foco Regional**: Priorizar regiões de maior receita identificadas
+2. **Expansão Estratégica**: Regiões com crescimento consistente
+3. **Marketing Localizado**: Adaptar estratégias por performance regional
+
+*Pergunte sobre regiões específicas para análises detalhadas!*"""
 
         elif any(word in message_lower for word in ['análise', 'analisar', 'relatório', 'relatorio', 'insights', 'relatório']):
             return f"""# 📈 Relatórios e Análises Disponíveis
@@ -837,8 +1003,11 @@ def auto_update_worker():
         update_data()
 
 if __name__ == '__main__':
-    # Cria diretório de templates se não existir
+    # Execução local
     import os
+    import sys
+    
+    # Cria diretório de templates se não existir
     os.makedirs('templates', exist_ok=True)
     
     # Inicia atualização automática em background
@@ -849,20 +1018,29 @@ if __name__ == '__main__':
     print("🔄 Carregando dados na inicialização...")
     update_data()
     
-    import sys
-    
     # Verifica se foi passada uma porta específica
-    port = 8081
+    port = int(os.environ.get('PORT', 8081))
     if len(sys.argv) > 1 and '--port' in sys.argv:
         try:
             port_index = sys.argv.index('--port')
             port = int(sys.argv[port_index + 1])
         except (ValueError, IndexError):
-            port = 8081
+            pass
     
-    print(f"Dashboard iniciado! Acesse: http://localhost:{port}")
-    app.run(debug=True, host='0.0.0.0', port=port)
+    print(f"🚀 Dashboard iniciado!")
+    print(f"📍 Local: http://localhost:{port}")
+    print(f"🌐 Network: http://0.0.0.0:{port}")
+    print(f"📊 Ambiente: {'Produção' if os.environ.get('VERCEL') else 'Desenvolvimento'}")
+    
+    # Debug mode apenas em desenvolvimento
+    debug_mode = not os.environ.get('VERCEL')
+    app.run(debug=debug_mode, host='0.0.0.0', port=port)
 else:
-    # Para Vercel - não inicializa dados automaticamente
+    # Para Vercel/Produção - carregamento sob demanda
     import os
     os.makedirs('templates', exist_ok=True)
+    print("✅ Aplicação pronta para Vercel")
+
+# Handler para Vercel
+# Exporta a aplicação Flask
+handler = app
