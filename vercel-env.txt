@@ -1,0 +1,4 @@
+# Configurações para Vercel - Copie estas variáveis para o painel do Vercel
+OPENROUTER_API_KEY=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
+PYTHON_VERSION=3.11
+FLASK_ENV=production

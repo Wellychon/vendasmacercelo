@@ -473,8 +473,10 @@ RESPONDA:"""
         try:
             from api_openrouter import consultar_ia
             ai_response = consultar_ia(prompt)
+            print("✅ Resposta da IA externa obtida")
         except Exception as e:
-            print(f"Erro na IA externa: {e}")
+            print(f"⚠️ IA externa indisponível: {e}")
+            print("🔄 Usando análise local inteligente...")
             # Fallback para análise local inteligente
             ai_response = generate_local_ai_response(user_message, context)
         
@@ -579,6 +581,70 @@ DADOS DETALHADOS DISPONÍVEIS:
     except Exception as e:
         return f"Erro ao preparar contexto: {str(e)}"
 
+def analyze_real_data():
+    """Analisa os dados reais carregados"""
+    try:
+        if not cached_data:
+            return "## **Status dos Dados**\n- ⚠️ Nenhum dado carregado\n- 🔄 Clique em 'Atualizar Dados' para carregar"
+        
+        # Prepara dados para análise
+        all_data = []
+        if isinstance(cached_data, dict):
+            for sheet_data in cached_data.values():
+                if 'dados' in sheet_data and isinstance(sheet_data['dados'], list):
+                    all_data.extend(sheet_data['dados'])
+        else:
+            all_data = cached_data
+        
+        if not all_data:
+            return "## **Status dos Dados**\n- ⚠️ Nenhum dado disponível\n- 🔄 Atualize os dados primeiro"
+        
+        # Análise básica dos dados
+        total_records = len(all_data)
+        total_revenue = 0
+        products = set()
+        regions = set()
+        categories = set()
+        
+        for row in all_data:
+            # Receita
+            try:
+                revenue = float(str(row.get('Receita Total', '0')).replace(',', '.').replace('R$', '').strip()) or 0
+                total_revenue += revenue
+            except (ValueError, TypeError):
+                pass
+            
+            # Produtos
+            if row.get('Produto'):
+                products.add(row['Produto'])
+            
+            # Regiões
+            if row.get('Região'):
+                regions.add(row['Região'])
+            
+            # Categorias
+            if row.get('Categoria'):
+                categories.add(row['Categoria'])
+        
+        avg_ticket = total_revenue / total_records if total_records > 0 else 0
+        
+        return f"""## **Análise dos Dados Reais**
+- **📊 Total de Registros**: {total_records:,}
+- **💰 Receita Total**: R$ {total_revenue:,.2f}
+- **🎯 Ticket Médio**: R$ {avg_ticket:,.2f}
+- **🛍️ Produtos Únicos**: {len(products)}
+- **🌍 Regiões Ativas**: {len(regions)}
+- **📂 Categorias**: {len(categories)}
+
+## **Insights Baseados em Dados Reais**
+- **Base de Dados**: {total_records:,} transações analisadas
+- **Diversificação**: {len(products)} produtos diferentes
+- **Cobertura Geográfica**: {len(regions)} regiões
+- **Segmentação**: {len(categories)} categorias"""
+        
+    except Exception as e:
+        return f"## **Status dos Dados**\n- ❌ Erro na análise: {str(e)}"
+
 def generate_local_ai_response(user_message, context):
     """Gera resposta inteligente local baseada nos dados"""
     try:
@@ -620,14 +686,19 @@ def generate_local_ai_response(user_message, context):
 
 *Carregue os dados primeiro e depois faça suas perguntas!*"""
         
-        # Análise contextual inteligente
+        # Análise contextual inteligente com dados reais
         if any(word in message_lower for word in ['vendas', 'venda', 'performance', 'resultado', 'resumo']):
+            # Analisa dados reais se disponíveis
+            real_analysis = analyze_real_data()
+            
             return f"""# 📊 Resumo de Vendas Atual
 
 ## **Métricas Principais**
 - **Total de Transações**: {total_records:,}
 - **Receita Total**: R$ {total_revenue:,.2f}
 - **Ticket Médio**: R$ {avg_ticket:,.2f}
+
+{real_analysis}
 
 ## **Insights Estratégicos**
 Com base nos seus dados, posso identificar padrões importantes e oportunidades de crescimento. Sua base de {total_records:,} transações oferece uma visão robusta do desempenho.
@@ -791,3 +862,7 @@ if __name__ == '__main__':
     
     print(f"Dashboard iniciado! Acesse: http://localhost:{port}")
     app.run(debug=True, host='0.0.0.0', port=port)
+else:
+    # Para Vercel - não inicializa dados automaticamente
+    import os
+    os.makedirs('templates', exist_ok=True)

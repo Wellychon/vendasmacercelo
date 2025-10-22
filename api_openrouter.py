@@ -2,7 +2,7 @@ from openai import OpenAI
 import os
 
 # Sua chave de API real do OpenRouter
-API_KEY = "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"
+API_KEY = "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"
 
 print(f"🔑 Usando sua chave de API: {API_KEY[:20]}...")
 
