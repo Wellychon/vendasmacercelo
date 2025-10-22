@@ -1035,12 +1035,3 @@ if __name__ == '__main__':
     # Debug mode apenas em desenvolvimento
     debug_mode = not os.environ.get('VERCEL')
     app.run(debug=debug_mode, host='0.0.0.0', port=port)
-else:
-    # Para Vercel/Produção - carregamento sob demanda
-    import os
-    os.makedirs('templates', exist_ok=True)
-    print("✅ Aplicação pronta para Vercel")
-
-# Handler para Vercel
-# Exporta a aplicação Flask
-handler = app

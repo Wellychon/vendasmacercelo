@@ -1,0 +1,19 @@
+# ============================================
+# ARQUIVO DE CONFIGURAÇÃO - VARIÁVEIS DE AMBIENTE
+# ============================================
+# 
+# INSTRUÇÕES:
+# 1. Copie este arquivo e renomeie para: .env
+# 2. Preencha as variáveis abaixo
+# 3. Não compartilhe o arquivo .env (já está no .gitignore)
+#
+# ============================================
+
+# Configuração da API do OpenRouter
+OPENROUTER_API_KEY=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
+
+# URL do Google Apps Script
+# Cole aqui a URL gerada quando você fizer o deploy no Google Apps Script
+# Exemplo: https://script.google.com/macros/s/AKfycbxxx.../exec
+APPS_SCRIPT_URL=https://script.google.com/macros/s/AKfycbxAUZpKmGHYieJNvtLFzkYPTvPCfKhdvm-b3cec3Bf_DNRkp4QRHRo75t4cQXzs2Ns0vA/exec
+
